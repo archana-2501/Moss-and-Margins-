@@ -1320,3 +1320,136 @@
     else { cancelAnimationFrame(rainAnim); ctx.clearRect(0, 0, canvas.width, canvas.height); }
   }
 </script>
+
+<div id="mm-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(44,36,22,0.55);z-index:200;align-items:center;justify-content:center;padding:1rem;">
+  <div id="mm-modal" style="background:#f5f0e8;border-radius:12px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(44,36,22,0.25);">
+
+    <!-- Modal header -->
+    <div style="background:#2d4a2a;padding:1.25rem 1.5rem;border-radius:12px 12px 0 0;display:flex;align-items:flex-start;justify-content:space-between;">
+      <div>
+        <div style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:#b8972e;font-weight:500;margin-bottom:4px;">✦ Today's Prompt</div>
+        <div id="mm-modal-prompt-title" style="font-family:'Playfair Display',serif;font-size:20px;color:#f5f0e8;"></div>
+      </div>
+      <button onclick="mmCloseModal()" aria-label="Close" style="background:rgba(245,240,232,0.1);border:none;color:#c9b99a;font-size:20px;width:32px;height:32px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:12px;transition:background 0.2s;">✕</button>
+    </div>
+
+    <!-- Type selector -->
+    <div style="padding:1.25rem 1.5rem 0;">
+      <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#6b5c4e;font-weight:500;margin-bottom:10px;">What are you sharing?</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;" id="mm-type-tabs">
+        <button class="mm-type-btn mm-active" data-type="reflection" onclick="mmSetType(this,'reflection')">📝 Reflection</button>
+        <button class="mm-type-btn" data-type="quote"      onclick="mmSetType(this,'quote')">💬 Quote</button>
+        <button class="mm-type-btn" data-type="book"       onclick="mmSetType(this,'book')">📖 Book Rec</button>
+        <button class="mm-type-btn" data-type="artwork"    onclick="mmSetType(this,'artwork')">🎨 Artwork</button>
+      </div>
+    </div>
+
+    <!-- Form body -->
+    <form id="mm-form" onsubmit="mmSubmit(event)" style="padding:1.25rem 1.5rem;">
+
+      <!-- Author name (all types) -->
+      <div style="margin-bottom:14px;">
+        <label style="font-size:12px;color:#6b5c4e;display:block;margin-bottom:5px;font-family:'Lora',serif;font-style:italic;">Your name or pen name</label>
+        <input id="mm-author" type="text" placeholder="e.g. elara_violet" maxlength="60"
+          style="width:100%;padding:9px 12px;border:1px solid #ede5d0;border-radius:6px;font-family:'Lora',serif;font-size:14px;background:#faf8f4;color:#2c2416;outline:none;" />
+      </div>
+
+      <!-- QUOTE fields -->
+      <div id="mm-fields-quote" class="mm-type-fields" style="display:none;">
+        <div style="margin-bottom:14px;">
+          <label style="font-size:12px;color:#6b5c4e;display:block;margin-bottom:5px;font-family:'Lora',serif;font-style:italic;">The quote</label>
+          <textarea id="mm-quote-text" rows="4" placeholder="The exact passage that moved you..."
+            style="width:100%;padding:9px 12px;border:1px solid #ede5d0;border-radius:6px;font-family:'Playfair Display',serif;font-style:italic;font-size:15px;background:#faf8f4;color:#2c2416;resize:vertical;outline:none;line-height:1.6;"></textarea>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="font-size:12px;color:#6b5c4e;display:block;margin-bottom:5px;font-family:'Lora',serif;font-style:italic;">Source (author &amp; book)</label>
+          <input id="mm-quote-source" type="text" placeholder="e.g. Sylvia Plath — The Bell Jar"
+            style="width:100%;padding:9px 12px;border:1px solid #ede5d0;border-radius:6px;font-family:'Lora',serif;font-size:14px;background:#faf8f4;color:#2c2416;outline:none;" />
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="font-size:12px;color:#6b5c4e;display:block;margin-bottom:5px;font-family:'Lora',serif;font-style:italic;">Why it matters to you (optional)</label>
+          <textarea id="mm-quote-reflection" rows="2" placeholder="A few words about why this passage lives in your margins..."
+            style="width:100%;padding:9px 12px;border:1px solid #ede5d0;border-radius:6px;font-family:'Lora',serif;font-size:14px;background:#faf8f4;color:#2c2416;resize:vertical;outline:none;line-height:1.6;"></textarea>
+        </div>
+      </div>
+
+      <!-- BOOK fields -->
+      <div id="mm-fields-book" class="mm-type-fields" style="display:none;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+          <div>
+            <label style="font-size:12px;color:#6b5c4e;display:block;margin-bottom:5px;font-family:'Lora',serif;font-style:italic;">Book title</label>
+            <input id="mm-book-title" type="text" placeholder="e.g. Possession"
+              style="width:100%;padding:9px 12px;border:1px solid #ede5d0;border-radius:6px;font-family:'Lora',serif;font-size:14px;background:#faf8f4;color:#2c2416;outline:none;" />
+          </div>
+          <div>
+            <label style="font-size:12px;color:#6b5c4e;display:block;margin-bottom:5px;font-family:'Lora',serif;font-style:italic;">Author</label>
+            <input id="mm-book-author" type="text" placeholder="e.g. A.S. Byatt"
+              style="width:100%;padding:9px 12px;border:1px solid #ede5d0;border-radius:6px;font-family:'Lora',serif;font-size:14px;background:#faf8f4;color:#2c2416;outline:none;" />
+          </div>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="font-size:12px;color:#6b5c4e;display:block;margin-bottom:5px;font-family:'Lora',serif;font-style:italic;">Your recommendation</label>
+          <textarea id="mm-book-content" rows="3" placeholder="Why should someone pick this up on a rainy afternoon?"
+            style="width:100%;padding:9px 12px;border:1px solid #ede5d0;border-radius:6px;font-family:'Lora',serif;font-size:14px;background:#faf8f4;color:#2c2416;resize:vertical;outline:none;line-height:1.6;"></textarea>
+        </div>
+      </div>
+
+      <!-- ARTWORK fields -->
+      <div id="mm-fields-artwork" class="mm-type-fields" style="display:none;">
+        <div style="margin-bottom:14px;">
+          <label style="font-size:12px;color:#6b5c4e;display:block;margin-bottom:5px;font-family:'Lora',serif;font-style:italic;">Image URL</label>
+          <input id="mm-artwork-url" type="url" placeholder="https://... (link to your image)"
+            style="width:100%;padding:9px 12px;border:1px solid #ede5d0;border-radius:6px;font-family:'Lora',serif;font-size:14px;background:#faf8f4;color:#2c2416;outline:none;" />
+          <div style="font-size:11px;color:#8b6f5e;margin-top:4px;font-style:italic;">Tip: upload to Imgur, Cloudinary, or your own host first</div>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="font-size:12px;color:#6b5c4e;display:block;margin-bottom:5px;font-family:'Lora',serif;font-style:italic;">About this piece</label>
+          <textarea id="mm-artwork-content" rows="3" placeholder="Describe your work, your process, what inspired it..."
+            style="width:100%;padding:9px 12px;border:1px solid #ede5d0;border-radius:6px;font-family:'Lora',serif;font-size:14px;background:#faf8f4;color:#2c2416;resize:vertical;outline:none;line-height:1.6;"></textarea>
+        </div>
+      </div>
+
+      <!-- REFLECTION fields (default) -->
+      <div id="mm-fields-reflection" class="mm-type-fields">
+        <div style="margin-bottom:14px;">
+          <label style="font-size:12px;color:#6b5c4e;display:block;margin-bottom:5px;font-family:'Lora',serif;font-style:italic;">Your reflection</label>
+          <textarea id="mm-reflection-content" rows="5" placeholder="Begin here. No pressure, no performance. Just you and the page..."
+            style="width:100%;padding:9px 12px;border:1px solid #ede5d0;border-radius:6px;font-family:'Lora',serif;font-size:14px;background:#faf8f4;color:#2c2416;resize:vertical;outline:none;line-height:1.6;"></textarea>
+        </div>
+      </div>
+
+      <!-- Tags (all types) -->
+      <div style="margin-bottom:18px;">
+        <div style="font-size:12px;color:#6b5c4e;margin-bottom:8px;font-family:'Lora',serif;font-style:italic;">Add tags</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;" id="mm-tag-row">
+          <button type="button" class="mm-tag-btn" onclick="mmToggleTag(this,'cottagecore')">#cottagecore</button>
+          <button type="button" class="mm-tag-btn" onclick="mmToggleTag(this,'dark academia')">#dark academia</button>
+          <button type="button" class="mm-tag-btn" onclick="mmToggleTag(this,'poetry')">#poetry</button>
+          <button type="button" class="mm-tag-btn" onclick="mmToggleTag(this,'watercolor')">#watercolor</button>
+          <button type="button" class="mm-tag-btn" onclick="mmToggleTag(this,'nature writing')">#nature writing</button>
+          <button type="button" class="mm-tag-btn" onclick="mmToggleTag(this,'journaling')">#journaling</button>
+          <button type="button" class="mm-tag-btn" onclick="mmToggleTag(this,'classics')">#classics</button>
+          <button type="button" class="mm-tag-btn" onclick="mmToggleTag(this,'sketchbook')">#sketchbook</button>
+        </div>
+      </div>
+
+      <!-- Error message -->
+      <div id="mm-error" style="display:none;background:#fdf0f0;border:1px solid #e8b4b4;border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:13px;color:#7a3a3a;font-family:'Lora',serif;"></div>
+
+      <!-- Submit -->
+      <button type="submit" id="mm-submit-btn"
+        style="width:100%;background:#2d4a2a;color:#f5f0e8;border:none;padding:12px;border-radius:6px;font-family:'Lora',serif;font-size:15px;font-style:italic;cursor:pointer;letter-spacing:0.03em;transition:opacity 0.2s;">
+        Share quietly ✦
+      </button>
+    </form>
+
+    <!-- Success state (hidden until submit) -->
+    <div id="mm-success" style="display:none;padding:2rem 1.5rem;text-align:center;">
+      <div style="font-size:40px;margin-bottom:12px;">🌿</div>
+      <div style="font-family:'Playfair Display',serif;font-size:20px;color:#2d4a2a;margin-bottom:8px;">Shared with the forest.</div>
+      <div style="font-family:'Lora',serif;font-style:italic;font-size:14px;color:#6b5c4e;margin-bottom:20px;">Your response has joined today's gathering.</div>
+      <button onclick="mmCloseModal()" style="background:#2d4a2a;color:#f5f0e8;border:none;padding:10px 24px;border-radius:6px;font-family:'Lora',serif;font-size:14px;cursor:pointer;">Return to the garden</button>
+    </div>
+
+  </div>
+</div>
