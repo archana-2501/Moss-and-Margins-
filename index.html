@@ -1472,5 +1472,353 @@
       <button onclick="mmCloseModal()" style="background:#2d4a2a;color:#f5f0e8;border:none;padding:10px 24px;border-radius:6px;font-family:'Lora',serif;font-size:14px;cursor:pointer;">Return to the garden</button>
     </div>
 
-  </div>
+<style>
+  .mm-type-btn {
+    padding: 7px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    cursor: pointer;
+    border: 1px solid #ede5d0;
+    background: #faf8f4;
+    color: #6b5c4e;
+    font-family: 'Lora', serif;
+    transition: all 0.2s;
+  }
+  .mm-type-btn.mm-active {
+    background: #2d4a2a;
+    color: #f5f0e8;
+    border-color: #2d4a2a;
+  }
+  .mm-tag-btn {
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid #c9b99a;
+    background: transparent;
+    color: #8b6f5e;
+    font-family: 'Lora', serif;
+    transition: all 0.2s;
+  }
+  .mm-tag-btn.mm-tag-active {
+    background: #4a6741;
+    color: #d4e8cc;
+    border-color: #4a6741;
+  }
+  .mm-filter-btn {
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid #ede5d0;
+    background: white;
+    color: #6b5c4e;
+    font-family: 'Lora', serif;
+    transition: all 0.2s;
+  }
+  .mm-filter-btn.mm-filter-active {
+    background: #2d4a2a;
+    color: #f5f0e8;
+    border-color: #2d4a2a;
+  }
+  #mm-modal-overlay { display: none; }
+  #mm-modal-overlay.mm-open { display: flex !important; }
+  #mm-submit-btn:hover { opacity: 0.88; }
+  .mm-post-card {
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #ede5d0;
+    margin-bottom: 1rem;
+    overflow: hidden;
+    transition: box-shadow 0.2s;
+  }
+  .mm-post-card:hover { box-shadow: 0 2px 12px rgba(44,36,22,0.08); }
+  .mm-post-body { padding: 1rem 1.1rem 0.75rem; }
+  .mm-post-type { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: #7a9b70; font-weight: 500; margin-bottom: 6px; }
+  .mm-post-text { font-family: 'Lora', serif; font-size: 14px; color: #2c2416; line-height: 1.65; }
+  .mm-post-quote { border-left: 3px solid #c9b99a; padding-left: 12px; font-family: 'Playfair Display', serif; font-size: 15px; font-style: italic; color: #8b6f5e; line-height: 1.6; margin: 8px 0; }
+  .mm-post-meta { display: flex; align-items: center; justify-content: space-between; padding: 8px 1.1rem; border-top: 1px solid #ede5d0; background: #faf8f4; }
+  .mm-author { display: flex; align-items: center; gap: 8px; }
+  .mm-avatar { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; background: #d4e8cc; color: #2d4a2a; flex-shrink: 0; }
+  .mm-author-name { font-size: 12px; color: #6b5c4e; font-family: 'Lora', serif; font-style: italic; }
+  .mm-like-btn { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #8b6f5e; cursor: pointer; border: none; background: transparent; padding: 4px 8px; border-radius: 4px; font-family: 'Lora', serif; transition: color 0.2s; }
+  .mm-like-btn:hover { color: #c17b7b; }
+  .mm-like-btn.mm-liked { color: #c17b7b; }
+  .mm-tag-pill { display: inline-block; background: #f0f4ee; color: #4a6741; border: 1px solid #d4e8cc; font-size: 11px; padding: 2px 8px; border-radius: 20px; margin-right: 4px; margin-top: 6px; }
+  .mm-empty-state { text-align: center; padding: 3rem 1rem; font-family: 'Lora', serif; font-style: italic; color: #8b6f5e; }
+  .mm-book-spine { width: 44px; height: 64px; border-radius: 2px 6px 6px 2px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, #2d4a2a, #4a6741); }
+  .mm-book-spine span { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 8px; color: #a8c99e; font-family: 'Lora', serif; padding: 4px; overflow: hidden; max-height: 56px; display: block; }
+</style>
+
+<script>
+(function() {
+  // ── State ──────────────────────────────────────────────────────
+  let currentPromptId = null;
+  let currentType     = 'reflection';
+  let selectedTags    = [];
+  let activeFilter    = 'all';
+  let allResponses    = [];
+
+  // ── Init ───────────────────────────────────────────────────────
+  async function mmInit() {
+    await mmLoadPrompt();
+    await mmLoadResponses();
+    // Subscribe to real-time new responses
+    db.channel('responses-channel')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'responses' }, (payload) => {
+        allResponses.unshift(payload.new);
+        mmRenderFeed();
+      })
+      .subscribe();
+  }
+
+  // ── Load today's prompt ────────────────────────────────────────
+  async function mmLoadPrompt() {
+    const today = new Date().toISOString().split('T')[0];
+    const { data, error } = await db
+      .from('prompts')
+      .select('*')
+      .eq('active_date', today)
+      .single();
+
+    if (data) {
+      currentPromptId = data.id;
+      const el = document.getElementById('mm-modal-prompt-title');
+      if (el) el.textContent = data.title;
+    }
+  }
+
+  // ── Load responses ─────────────────────────────────────────────
+  async function mmLoadResponses() {
+    const loading = document.getElementById('mm-loading');
+    if (!currentPromptId) {
+      if (loading) loading.textContent = 'No prompt for today yet — check back soon.';
+      return;
+    }
+
+    const { data, error } = await db
+      .from('responses')
+      .select('*')
+      .eq('prompt_id', currentPromptId)
+      .order('created_at', { ascending: false });
+
+    if (loading) loading.style.display = 'none';
+
+    if (error) { console.error(error); return; }
+    allResponses = data || [];
+    mmRenderFeed();
+  }
+
+  // ── Render feed ────────────────────────────────────────────────
+  function mmRenderFeed() {
+    const container = document.getElementById('mm-feed-container');
+    if (!container) return;
+
+    const filtered = activeFilter === 'all'
+      ? allResponses
+      : allResponses.filter(r => r.type === activeFilter);
+
+    if (filtered.length === 0) {
+      container.innerHTML = `<div class="mm-empty-state">
+        <div style="font-size:32px;margin-bottom:12px;">🌿</div>
+        <div>Be the first to respond to today's prompt.</div>
+      </div>`;
+      return;
+    }
+
+    container.innerHTML = filtered.map(r => mmBuildCard(r)).join('');
+  }
+
+  // ── Build a single post card ───────────────────────────────────
+  function mmBuildCard(r) {
+    const typeLabel  = { reflection: '✦ Reflection', quote: '✦ Quote', book: '✦ Book Rec', artwork: '✦ Artwork' }[r.type] || '✦ Note';
+    const initials   = (r.author_name || 'A').slice(0, 2).toUpperCase();
+    const timeAgo    = mmTimeAgo(r.created_at);
+    const tags       = (r.tags || []).map(t => `<span class="mm-tag-pill">${t}</span>`).join('');
+
+    let body = '';
+
+    if (r.type === 'quote') {
+      body = `
+        <div class="mm-post-quote">${mmEscape(r.content)}</div>
+        ${r.quote_source ? `<div style="font-size:12px;color:#8b6f5e;margin-top:6px;font-style:italic;">— ${mmEscape(r.quote_source)}</div>` : ''}`;
+    } else if (r.type === 'book') {
+      body = `
+        <div style="display:flex;gap:12px;align-items:flex-start;margin:8px 0;">
+          <div class="mm-book-spine"><span>${mmEscape(r.book_author || '')}</span></div>
+          <div>
+            <div style="font-family:'Playfair Display',serif;font-size:16px;color:#2c2416;margin-bottom:2px;">${mmEscape(r.book_title || '')}</div>
+            ${r.book_author ? `<div style="font-size:12px;color:#8b6f5e;margin-bottom:8px;">${mmEscape(r.book_author)}</div>` : ''}
+            <div class="mm-post-text">${mmEscape(r.content)}</div>
+          </div>
+        </div>`;
+    } else if (r.type === 'artwork') {
+      body = `
+        ${r.image_url ? `<img src="${mmEscape(r.image_url)}" alt="Artwork by ${mmEscape(r.author_name)}" style="width:100%;max-height:280px;object-fit:cover;border-radius:4px;margin-bottom:8px;" onerror="this.style.display='none'">` : ''}
+        <div class="mm-post-text">${mmEscape(r.content)}</div>`;
+    } else {
+      body = `<div class="mm-post-text">${mmEscape(r.content)}</div>`;
+    }
+
+    return `
+      <div class="mm-post-card" id="card-${r.id}">
+        <div class="mm-post-body">
+          <div class="mm-post-type">${typeLabel}</div>
+          ${body}
+          ${tags ? `<div style="margin-top:8px;">${tags}</div>` : ''}
+        </div>
+        <div class="mm-post-meta">
+          <div class="mm-author">
+            <div class="mm-avatar">${initials}</div>
+            <span class="mm-author-name">${mmEscape(r.author_name)}</span>
+            <span style="font-size:11px;color:#c9b99a;margin-left:4px;">${timeAgo}</span>
+          </div>
+          <button class="mm-like-btn ${r._liked ? 'mm-liked' : ''}" onclick="mmLike('${r.id}', this)">
+            ♡ <span class="mm-like-count">${r.likes || 0}</span>
+          </button>
+        </div>
+      </div>`;
+  }
+
+  // ── Like a response ────────────────────────────────────────────
+  window.mmLike = async function(id, btn) {
+    const resp = allResponses.find(r => r.id === id);
+    if (!resp || resp._liked) return;
+    resp._liked = true;
+    resp.likes  = (resp.likes || 0) + 1;
+
+    btn.classList.add('mm-liked');
+    btn.querySelector('.mm-like-count').textContent = resp.likes;
+
+    await db.from('responses').update({ likes: resp.likes }).eq('id', id);
+  };
+
+  // ── Modal open/close ───────────────────────────────────────────
+  window.mmOpenModal = function() {
+    document.getElementById('mm-modal-overlay').classList.add('mm-open');
+    document.getElementById('mm-form').style.display = '';
+    document.getElementById('mm-success').style.display = 'none';
+    document.getElementById('mm-error').style.display = 'none';
+  };
+  window.mmCloseModal = function() {
+    document.getElementById('mm-modal-overlay').classList.remove('mm-open');
+  };
+  document.getElementById('mm-modal-overlay').addEventListener('click', function(e) {
+    if (e.target === this) mmCloseModal();
+  });
+
+  // ── Type switching ─────────────────────────────────────────────
+  window.mmSetType = function(btn, type) {
+    currentType = type;
+    document.querySelectorAll('.mm-type-btn').forEach(b => b.classList.remove('mm-active'));
+    btn.classList.add('mm-active');
+    document.querySelectorAll('.mm-type-fields').forEach(el => el.style.display = 'none');
+    const fields = document.getElementById('mm-fields-' + type);
+    if (fields) fields.style.display = '';
+  };
+
+  // ── Tag toggling ───────────────────────────────────────────────
+  window.mmToggleTag = function(btn, tag) {
+    btn.classList.toggle('mm-tag-active');
+    if (btn.classList.contains('mm-tag-active')) {
+      if (!selectedTags.includes(tag)) selectedTags.push(tag);
+    } else {
+      selectedTags = selectedTags.filter(t => t !== tag);
+    }
+  };
+
+  // ── Filter feed ────────────────────────────────────────────────
+  window.mmFilter = function(btn, type) {
+    activeFilter = type;
+    document.querySelectorAll('.mm-filter-btn').forEach(b => b.classList.remove('mm-filter-active'));
+    btn.classList.add('mm-filter-active');
+    mmRenderFeed();
+  };
+
+  // ── Form submit ────────────────────────────────────────────────
+  window.mmSubmit = async function(e) {
+    e.preventDefault();
+    const submitBtn = document.getElementById('mm-submit-btn');
+    const errorEl   = document.getElementById('mm-error');
+
+    errorEl.style.display = 'none';
+    submitBtn.disabled    = true;
+    submitBtn.textContent = 'Sharing...';
+
+    try {
+      const payload = mmBuildPayload();
+      if (!payload) {
+        throw new Error('Please fill in the required fields before sharing.');
+      }
+
+      const { error } = await db.from('responses').insert([payload]);
+      if (error) throw error;
+
+      document.getElementById('mm-form').style.display    = 'none';
+      document.getElementById('mm-success').style.display = '';
+      mmResetForm();
+    } catch (err) {
+      errorEl.textContent    = err.message || 'Something went wrong. Please try again.';
+      errorEl.style.display  = '';
+    } finally {
+      submitBtn.disabled    = false;
+      submitBtn.textContent = 'Share quietly ✦';
+    }
+  };
+
+  function mmBuildPayload() {
+    const author = (document.getElementById('mm-author').value || '').trim() || 'Anonymous Wanderer';
+    const base   = { prompt_id: currentPromptId, type: currentType, author_name: author, tags: selectedTags };
+
+    if (currentType === 'reflection') {
+      const c = document.getElementById('mm-reflection-content').value.trim();
+      if (!c) return null;
+      return { ...base, content: c };
+    }
+    if (currentType === 'quote') {
+      const c = document.getElementById('mm-quote-text').value.trim();
+      if (!c) return null;
+      return { ...base, content: c, quote_source: document.getElementById('mm-quote-source').value.trim() };
+    }
+    if (currentType === 'book') {
+      const title = document.getElementById('mm-book-title').value.trim();
+      const c     = document.getElementById('mm-book-content').value.trim();
+      if (!title || !c) return null;
+      return { ...base, content: c, book_title: title, book_author: document.getElementById('mm-book-author').value.trim() };
+    }
+    if (currentType === 'artwork') {
+      const c = document.getElementById('mm-artwork-content').value.trim();
+      if (!c) return null;
+      return { ...base, content: c, image_url: document.getElementById('mm-artwork-url').value.trim() };
+    }
+    return null;
+  }
+
+  function mmResetForm() {
+    selectedTags = [];
+    document.querySelectorAll('.mm-tag-btn').forEach(b => b.classList.remove('mm-tag-active'));
+    ['mm-author','mm-quote-text','mm-quote-source','mm-quote-reflection',
+     'mm-book-title','mm-book-author','mm-book-content',
+     'mm-artwork-url','mm-artwork-content','mm-reflection-content']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────
+  function mmEscape(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function mmTimeAgo(iso) {
+    const s = Math.round((Date.now() - new Date(iso)) / 1000);
+    if (s < 60)     return 'just now';
+    if (s < 3600)   return Math.floor(s / 60) + 'm ago';
+    if (s < 86400)  return Math.floor(s / 3600) + 'h ago';
+    return Math.floor(s / 86400) + 'd ago';
+  }
+
+  // ── Start ──────────────────────────────────────────────────────
+  mmInit();
+})();
+</script>  </div>
 </div>
