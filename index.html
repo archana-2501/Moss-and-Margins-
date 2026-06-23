@@ -778,8 +778,8 @@
       </div>
       <div class="prompt-card">
         <div class="prompt-label">✦ June 19th</div>
-        <div class="prompt-title">Rain on Old Windows</div>
-        <div class="prompt-sub">"The kind of afternoon that blurs the world and sharpens the self."</div>
+          <div class="prompt-title" id="prompt-title">Loading...</div>
+  <div class="prompt-sub" id="prompt-sub">Loading today's prompt...</div>
         <div class="prompt-tags">
           <span class="tag forest">Watercolor</span>
           <span class="tag forest">Poetry</span>
@@ -1581,11 +1581,18 @@
       .eq('active_date', today)
       .single();
 
-    if (data) {
-      currentPromptId = data.id;
-      const el = document.getElementById('mm-modal-prompt-title');
-      if (el) el.textContent = data.title;
-    }
+   if (data) {
+  currentPromptId = data.id;
+
+  const modalTitle = document.getElementById('mm-modal-prompt-title');
+  if (modalTitle) modalTitle.textContent = data.title;
+
+  const pageTitle = document.getElementById('prompt-title');
+  if (pageTitle) pageTitle.textContent = data.title;
+
+  const pageSubtitle = document.getElementById('prompt-sub');
+  if (pageSubtitle) pageSubtitle.textContent = data.subtitle;
+}
   }
 
   // ── Load responses ─────────────────────────────────────────────
